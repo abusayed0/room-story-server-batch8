@@ -4,7 +4,7 @@ const port = process.env.PORT || 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 const jwt = require("jsonwebtoken");
-
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
 
@@ -34,6 +34,7 @@ async function run() {
 
         const roomStoryDB = client.db("roomStoryDB");
         const user = roomStoryDB.collection("user");
+        const payment = roomStoryDB.collection("payment");
 
         // custom middleware 
         const verifyToken = (req, res, next) => {
@@ -58,8 +59,8 @@ async function run() {
             const email = req.decoded.email;
             const query = { email: email, role: "hr" };
             const result = await user.findOne(query);
-            if(!result){
-                return res.status(403).send({message: "not hr"});
+            if (!result) {
+                return res.status(403).send({ message: "not hr" });
             }
             next();
         };
@@ -86,6 +87,15 @@ async function run() {
             const result = await user.insertOne(userInfo);
             res.send(result);
         });
+        // api for get single employee data only hr call it
+         // DONE make sucure
+        app.get("/users/:id",verifyToken, verifyHr, async (req, res) => {
+            const userId = req.params.id;
+            const query = { _id: new ObjectId(userId) };
+            const result = await user.findOne(query);
+            res.send(result);
+
+        });
         // api for get user role, any logged user can call it 
         app.get("/users/role/:email", verifyToken, async (req, res) => {
             const requestedUserEmail = req.params.email;
@@ -106,11 +116,12 @@ async function run() {
             res.send(cursor);
 
         });
+       
         // api for update employee verify status, only hr can call it
-        app.patch("/users/:id", verifyToken, verifyHr, async(req, res) => {
+        app.patch("/users/:id", verifyToken, verifyHr, async (req, res) => {
             const userId = req.params.id;
             const updatedStatus = req.body.isVerified;
-            const filter = { _id: new ObjectId(userId)};
+            const filter = { _id: new ObjectId(userId) };
             const updateDoc = {
                 $set: {
                     isVerified: updatedStatus
@@ -122,6 +133,24 @@ async function run() {
         });
 
 
+        // payments related api 
+
+        // api for save employee payment, only hr can call it 
+        // DONE make secure
+        app.post("/payments", verifyToken, verifyHr, async (req, res) => {
+            const paymentData = req.body;
+            const result = await payment.insertOne(paymentData);
+            res.send(result);
+        });
+        // api for get single employee payment only hr can call it 
+        // DONE make sucure
+        app.get("/payments/:id", verifyToken, verifyHr, async (req, res) => {
+            const userId = req.params.id;
+            const query = { userId: userId };
+            const result = await payment.find(query).toArray();
+            res.send(result);
+
+        });
 
 
 
@@ -129,12 +158,26 @@ async function run() {
 
 
 
+        // payment intent 
 
+        // for creating payment intent only hr can call it
+        app.post("/create-payment-intent", verifyToken, verifyHr, async (req, res) => {
+            const { salary } = req.body;
+            const amount = parseInt(salary) * 100;
+            console.log("amount inside payment intent :", amount);
+            // Create a PaymentIntent with the order amount and currency
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: "usd",
+                "payment_method_types": [
+                    "card"
+                ],
+            });
 
-
-
-
-
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
