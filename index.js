@@ -35,6 +35,7 @@ async function run() {
         const roomStoryDB = client.db("roomStoryDB");
         const user = roomStoryDB.collection("user");
         const payment = roomStoryDB.collection("payment");
+        const works = roomStoryDB.collection("work");
 
         // custom middleware 
         const verifyToken = (req, res, next) => {
@@ -61,6 +62,16 @@ async function run() {
             const result = await user.findOne(query);
             if (!result) {
                 return res.status(403).send({ message: "not hr" });
+            }
+            next();
+        };
+
+        const verifyEmployee = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email, role: "employee" };
+            const result = await user.findOne(query);
+            if (!result) {
+                return res.status(403).send({ message: "not employee" });
             }
             next();
         };
@@ -151,9 +162,34 @@ async function run() {
             res.send(result);
 
         });
+        // api for get single employe payment only employee can call it 
+        // DONE : make  sucure
+        app.get("/payment-history/:email", verifyToken, verifyEmployee, async (req, res) => {
+            const email = req.params.email;
+            const query = { userEmail: email};
+            const result = await payment.find(query).toArray();
+            res.send(result);
+
+        });
 
 
+        // work sheet related api 
 
+        // api for submit work sheet only employe can call it 
+        // DONE: make verified
+        app.post("/work-sheets", verifyToken, verifyEmployee, async(req, res) => {
+            const submissonWork = req.body;
+            const result = await works.insertOne(submissonWork);
+            res.send(result);
+        });
+        // api for get single employee work sheet only emloyee can call it 
+        // DONE  make verified
+        app.get("/work-sheets/:email", verifyToken, verifyEmployee, async(req, res) => {
+            const email = req.params.email;
+            const query = { employeeEmail : email };
+            const cursor = await works.find(query).toArray();
+            res.send(cursor);
+        });
 
 
 
