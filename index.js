@@ -75,6 +75,15 @@ async function run() {
             }
             next();
         };
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email, role: "admin" };
+            const result = await user.findOne(query);
+            if (!result) {
+                return res.status(403).send({ message: "not admin" });
+            }
+            next();
+        };
 
 
 
@@ -99,8 +108,8 @@ async function run() {
             res.send(result);
         });
         // api for get single employee data only hr call it
-         // DONE make sucure
-        app.get("/users/:id",verifyToken, verifyHr, async (req, res) => {
+        // DONE make sucure
+        app.get("/users/:id", verifyToken, verifyHr, async (req, res) => {
             const userId = req.params.id;
             const query = { _id: new ObjectId(userId) };
             const result = await user.findOne(query);
@@ -127,7 +136,18 @@ async function run() {
             res.send(cursor);
 
         });
-       
+        // api for get all employee including hr only admin can call this.
+        // DONE  make secure 
+        app.get("/all-employee-list", verifyToken, verifyAdmin, async (req, res) => {
+            const query = {
+                isVerified: true,
+                role: { $in: ["employee", "hr"] }
+            }
+            const cursor = await user.find(query).toArray();
+            res.send(cursor);
+
+        });
+
         // api for update employee verify status, only hr can call it
         app.patch("/users/:id", verifyToken, verifyHr, async (req, res) => {
             const userId = req.params.id;
@@ -141,6 +161,32 @@ async function run() {
             const result = await user.updateOne(filter, updateDoc);
             res.send(result);
 
+        });
+        // api for fire emplyee/hr, only admin call call this 
+        // DONE : make verified
+        app.patch("/users/fired/:id", verifyToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    isFired: true
+                }
+            };
+            const result = await user.updateOne(filter, updatedDoc);
+            res.send(result);
+        });
+        // api for make employee hr, only admin can call this
+        // DONE make verified
+        app.patch("/users/make-hr/:id", verifyToken, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const updatedDoc = {
+                $set: {
+                    role: "hr"
+                }
+            };
+            const result = await user.updateOne(filter, updatedDoc);
+            res.send(result);
         });
 
 
@@ -166,7 +212,7 @@ async function run() {
         // DONE : make  sucure
         app.get("/payment-history/:email", verifyToken, verifyEmployee, async (req, res) => {
             const email = req.params.email;
-            const query = { userEmail: email};
+            const query = { userEmail: email };
             const result = await payment.find(query).toArray();
             res.send(result);
 
@@ -177,16 +223,23 @@ async function run() {
 
         // api for submit work sheet only employe can call it 
         // DONE: make verified
-        app.post("/work-sheets", verifyToken, verifyEmployee, async(req, res) => {
+        app.post("/work-sheets", verifyToken, verifyEmployee, async (req, res) => {
             const submissonWork = req.body;
             const result = await works.insertOne(submissonWork);
             res.send(result);
         });
+        // api for get all work sheet only hr can call it 
+        // DONE make verified
+        app.get("/work-sheets", verifyToken, verifyHr, async (req, res) => {
+            const query = {};
+            const cursor = await works.find(query).toArray();
+            res.send(cursor);
+        })
         // api for get single employee work sheet only emloyee can call it 
         // DONE  make verified
-        app.get("/work-sheets/:email", verifyToken, verifyEmployee, async(req, res) => {
+        app.get("/work-sheets/:email", verifyToken, verifyEmployee, async (req, res) => {
             const email = req.params.email;
-            const query = { employeeEmail : email };
+            const query = { employeeEmail: email };
             const cursor = await works.find(query).toArray();
             res.send(cursor);
         });
