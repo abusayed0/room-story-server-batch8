@@ -30,7 +30,7 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
         const roomStoryDB = client.db("roomStoryDB");
         const user = roomStoryDB.collection("user");
@@ -89,8 +89,16 @@ async function run() {
 
 
         // jwt related api 
-        app.post("/jwt", (req, res) => {
+        app.post("/jwt", async(req, res) => {
             const userInfo = req.body;
+            const {email} = userInfo;
+            const query = {email: email};
+            const result = await user.findOne(query);
+            // if user is fired return his/him without token 
+            console.log("is fired:" ,result.isFired);
+            if((result && result.isFired)){
+                return res.status(403).send({message: "fired user"});
+            }
             console.log("token request user info", userInfo);
             const token = jwt.sign(userInfo, process.env.ACCESS_TOKEN_SECRET, {
                 expiresIn: "1h",
@@ -268,9 +276,9 @@ async function run() {
             });
         });
 
-        // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+        // // Send a ping to confirm a successful connection
+        // await client.db("admin").command({ ping: 1 });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
