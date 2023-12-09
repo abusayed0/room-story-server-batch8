@@ -9,7 +9,14 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const app = express();
 
 // middleware 
-app.use(cors());
+app.use(cors(
+  {
+    origin: [
+        "https://room-story.netlify.app",
+        // "http://localhost:5173"
+    ]
+  }
+));
 app.use(express.json());
 
 
@@ -95,7 +102,7 @@ async function run() {
             const query = {email: email};
             const result = await user.findOne(query);
             // if user is fired return his/him without token 
-            console.log("is fired:" ,result.isFired);
+            // console.log("is fired:" ,result.isFired);
             if((result && result.isFired)){
                 return res.status(403).send({message: "fired user"});
             }
@@ -206,6 +213,17 @@ async function run() {
             const paymentData = req.body;
             const result = await payment.insertOne(paymentData);
             res.send(result);
+        });
+        // api for get is already paid for the month, only hr can call it
+        // TODO: make verified 
+        app.post("/payments-status",verifyToken, verifyHr, async(req, res) => {
+            const searchInfo = req.body;
+            console.log(searchInfo);
+            const query = {userEmail:searchInfo.email, paymentFor: searchInfo.paymentFor};
+        
+            const result = await payment.findOne(query);
+            console.log(result);
+            res.send (result);
         });
         // api for get single employee payment only hr can call it 
         // DONE make sucure
